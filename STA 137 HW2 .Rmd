@@ -1,0 +1,404 @@
+---
+title: "STA 137 HW #2"
+author: "Kathy Mo, Hengyuan Liu, Weilin Cheng"
+output:
+    pdf_document:
+      toc: true # table of content true
+      fig_caption: true
+---
+
+\newpage
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, # show code 
+  warning = FALSE,  
+  message = FALSE
+)
+```
+
+
+\begin{itemize}
+  \item You may form a group of 3 students and submit one completed homework for the group.
+  \item You can put bullet points like this.
+\end{itemize}
+
+
+```{r,include=FALSE}
+library("ggplot2")                    
+library("GGally")                   
+library("corrplot")
+library("ggplot2")
+library("qqplotr")
+library("leaps")
+library("readxl")
+```
+
+# Homework 2: Due by 11.59pm on Monday, October 10.
+
+# Problem 1
+1. Please find attached the data on US crude oil production in the oil USCrude1.xls.
+Let Yt the crude oil production at time t: [time 1 is year 1900 and time 119
+is year 2018]
+
+```{r}
+us <- read_excel('/Users/davidliu/Desktop/Dataset/USCrude1.xls', sheet='Data 1')
+#str(us)
+head(us)
+#us[-(1:2),]
+#colnames(us) <- c("date", "oil")
+#head(us)
+```
+(a)Estimate the trend using
+(i) a polynomial of degree 6
+(ii) loess with span = 0:2; and 
+(iii) spline. Plot Y_t and the three trend estimates against time on the same graph. [Create a variable tm=1:119. Please see pages 5-6 in Handout 4 for R commands.].
+
+```{r}
+y <- us$oil
+tm <- 1:119 ##a new time variable
+plot(tm, y, type = "l") ###just to see the trend visually
+```
+
+
+(i) a polynomial of degree 6
+```{r}
+###fitting the polynomial trend
+polytrnd=lm(y~poly(tm,6))
+plot(tm, y, type="l", lty=1, xlab="Time", ylab="oil prod", main="Time series with polynominol Trend")
+points(tm, polytrnd$fitted.values, type="l", lty=1, col = "red")
+```
+(ii) loess with span = 0:2; and 
+```{r}
+####Fitting loess
+loesstrnd=loess(y~tm, span = 0.2)
+plot(tm, y, type="l", lty=1, xlab="Time", ylab="oil prod", main="Time series with loess")
+points(tm, loesstrnd$fitted, type="l", lty=1, col = "red")
+
+```
+(iii) spline. Plot Y_t and the three trend estimates against time on the same graph. [Create a variable tm=1:119. Please see pages 5-6 in Handout 4 for R commands.].
+```{r}
+trend_spline=function(y, lam){ 
+  n=length(y)
+  p=length(lam)
+  rsq=rep(0, p) 
+  y=sapply(y,as.numeric) 
+  tm=seq(1/n, 1, by=1/n) 
+  xx=cbind(tm, tm^2, tm^3) 
+  knot=seq(.1, .9, by=.1) 
+  m=length(knot)
+  for (j in 1:m){ 
+    u=pmax(tm-knot[j], 0); 
+    u=u^3 
+    xx=cbind(xx,u)
+  }
+  for (i in 1:p){
+    if (lam[i]==0){ 
+      ytran=log(y)
+    }
+    else{ 
+      ytran=(y^lam[i]-1)/lam[i]
+    }
+    ft=lm(ytran~xx)
+    res=ft$resid; 
+    sse=sum(res^2)
+    ssto=(n-1)*var(ytran)
+    rsq[i]=1-sse/ssto
+  }
+  ii=which.max(rsq); lamopt=lam[ii] 
+  if (lamopt==0){
+      ytran=log(y) } else {
+    ytran=y^lamopt
+  }
+  ft=lm(ytran~xx);
+  best_ft=step(ft, trace=0)
+  fit=best_ft$fitted; res=best_ft$resid
+  result=list(ytrans=ytran, fitted=fit, residual=res, rsq=rsq, lamopt=lamopt)
+  return(result)
+}
+
+splinetrnd=trend_spline(y, 1) ##note: lam = 1 means no transformation
+plot(tm, y, type="l", lty=1, xlab="Time", ylab="oil prod", main="Time series with spline trend")
+points(tm, splinetrnd$fitted, type="l", lty=1, col = "red")
+```
+```{r}
+plot(tm, y, type="l", lty=1, xlab="Time", ylab="Temp", main="Temp series with poly, loess, spline trend")
+points(tm, polytrnd$fitted.values, type="l", lty=1, col = "red")
+points(tm, loesstrnd$fitted, type="l", lty=2, col = "blue")
+points(tm, splinetrnd$fitted, type="l", lty=4, col = "brown")
+legend("bottomright", c("polyfit","loess", "spline"), lty=c(1,2,4), col = c("red", "blue", "brown"))
+
+
+```
+
+
+
+
+
+(b) Plot the three estimates of the rough X_t = Y_t mtagainst time (on separate plots), and obtain the three R2values. [R2is deÖned as 1P(Yt^mt)2= P(YtY )2]
+
+```{r}
+roughpoly = polytrnd$residuals
+roughloess = loesstrnd$residuals
+roughspline = splinetrnd$residual
+plot.ts(roughpoly)
+plot.ts(roughloess)
+plot.ts(roughspline)
+```
+
+```{r}
+#R square poly
+sse = sum((roughpoly)^2)
+ssto = sum((y-mean(y))^2)
+R2 = 1-sse/ssto
+R2
+```
+
+```{r}
+#Poly
+sse = sum((roughpoly)^2)
+ssto = sum((y-mean(y))^2)
+R2 = 1-sse/ssto
+R2
+
+#loess
+sse = sum((roughloess)^2)
+ssto = sum((y-mean(y))^2)
+R2 = 1-sse/ssto
+R2
+
+#spline
+sse = sum((roughspline)^2)
+ssto = sum((y-mean(y))^2)
+R2 = 1-sse/ssto
+R2
+
+
+```
+
+```{r}
+summary(loesstrnd)
+summary(polytrnd)
+```
+
+
+
+c) For each of the three separate estimates the trend, obtain a histogram of the
+rough f^Xtg, and the normal probability plot of f^Xtg. Do these graphs indicate
+any serious departure from the normality assumption? Explain. [R commands:
+"hist" for histogram, "qqnorm" for normal probability plot.]
+
+```{r}
+par(mfrow=c(1,2))
+hist(roughpoly, freq = F, main = "Histogram of Rough: Poly Trend", xlab = "Rough part")
+qqnorm(roughpoly, main = "Normal prob plot of Rough")
+qqline(roughpoly)
+
+```
+
+```{r}
+par(mfrow=c(1,2))
+hist(roughloess, freq = F, main = "Histogram of Rough: Poly Trend", xlab = "Rough part")
+qqnorm(roughloess, main = "Normal prob plot of Rough")
+qqline(roughloess)
+
+```
+
+```{r}
+par(mfrow=c(1,2))
+hist(roughspline, freq = F, main = "Histogram of Rough: Poly Trend", xlab = "Rough part")
+qqnorm(roughspline, main = "Normal prob plot of Rough")
+qqline(roughspline)
+
+```
+Explain: 
+
+
+
+
+
+(d) Comment on the relative merits of the three fits.
+
+
+# Problem 2
+
+2. Repeat parts (a)-(d) of Problem 1 when the data is transformed to Y't=
+log(Yt).
+```{r}
+y <- log(y)
+```
+2(a)Estimate the trend using
+(i) a polynomial of degree 6
+(ii) loess with span = 0:2; and 
+(iii) spline. Plot Y_t and the three trend estimates against time on the same graph. [Create a variable tm=1:119. Please see pages 5-6 in Handout 4 for R commands.].
+
+```{r}
+tm <- 1:119 ##a new time variable
+plot(tm, y, type = "l") ###just to see the trend visually
+
+```
+
+
+
+(i) a polynomial of degree 6
+```{r}
+###fitting the polynomial trend
+polytrnd=lm(y~poly(tm,6))
+plot(tm, y, type="l", lty=1, xlab="Time", ylab="oil prod", main="Time series with polynominol Trend")
+points(tm, polytrnd$fitted.values, type="l", lty=1, col = "red")
+
+```
+(ii) loess with span = 0:2; and 
+```{r}
+####Fitting loess
+loesstrnd=loess(y~tm, span = 0.2)
+plot(tm, y, type="l", lty=1, xlab="Time", ylab="oil prod", main="Time series with loess")
+points(tm, loesstrnd$fitted, type="l", lty=1, col = "red")
+```
+(iii) spline. Plot Y_t and the three trend estimates against time on the same graph. [Create a variable tm=1:119. Please see pages 5-6 in Handout 4 for R commands.].
+```{r}
+trend_spline=function(y, lam){ 
+  n=length(y)
+  p=length(lam)
+  rsq=rep(0, p) 
+  y=sapply(y,as.numeric) 
+  tm=seq(1/n, 1, by=1/n) 
+  xx=cbind(tm, tm^2, tm^3) 
+  knot=seq(.1, .9, by=.1) 
+  m=length(knot)
+  for (j in 1:m){ 
+    u=pmax(tm-knot[j], 0); 
+    u=u^3 
+    xx=cbind(xx,u)
+  }
+  for (i in 1:p){
+    if (lam[i]==0){ 
+      ytran=log(y)
+    }
+    else{ 
+      ytran=(y^lam[i]-1)/lam[i]
+    }
+    ft=lm(ytran~xx)
+    res=ft$resid; 
+    sse=sum(res^2)
+    ssto=(n-1)*var(ytran)
+    rsq[i]=1-sse/ssto
+  }
+  ii=which.max(rsq); lamopt=lam[ii] 
+  if (lamopt==0){
+      ytran=log(y) } else {
+    ytran=y^lamopt
+  }
+  ft=lm(ytran~xx);
+  best_ft=step(ft, trace=0)
+  fit=best_ft$fitted; res=best_ft$resid
+  result=list(ytrans=ytran, fitted=fit, residual=res, rsq=rsq, lamopt=lamopt)
+  return(result)
+}
+
+splinetrnd=trend_spline(y, 1) ##note: lam = 1 means no transformation
+plot(tm, y, type="l", lty=1, xlab="Time", ylab="oil prod", main="Time series with spline trend")
+points(tm, splinetrnd$fitted, type="l", lty=1, col = "red")
+```
+```{r}
+plot(tm, y, type="l", lty=1, xlab="Time", ylab="Temp", main="Temp series with poly, loess, spline trend")
+points(tm, polytrnd$fitted.values, type="l", lty=1, col = "red")
+points(tm, loesstrnd$fitted, type="l", lty=2, col = "blue")
+points(tm, splinetrnd$fitted, type="l", lty=4, col = "brown")
+legend("bottomright", c("polyfit","loess", "spline"), lty=c(1,2,4), col = c("red", "blue", "brown"))
+
+
+```
+
+(b) Plot the three estimates of the rough X_t = Y_t mtagainst time (on separate plots), and obtain the three R2values. [R2is deÖned as 1P(Yt^mt)2= P(YtY )2]
+
+```{r}
+roughpoly = polytrnd$residuals
+roughloess = loesstrnd$residuals
+roughspline = splinetrnd$residual
+plot.ts(roughpoly)
+plot.ts(roughloess)
+plot.ts(roughspline)
+```
+
+```{r}
+#R square poly
+sse = sum((roughpoly)^2)
+ssto = sum((y-mean(y))^2)
+R2 = 1-sse/ssto
+R2
+```
+
+
+```{r}
+#Poly
+sse = sum((roughpoly)^2)
+ssto = sum((y-mean(y))^2)
+R2 = 1-sse/ssto
+R2
+
+#loess
+sse = sum((roughloess)^2)
+ssto = sum((y-mean(y))^2)
+R2 = 1-sse/ssto
+R2
+
+#spline
+sse = sum((roughspline)^2)
+ssto = sum((y-mean(y))^2)
+R2 = 1-sse/ssto
+R2
+
+
+```
+
+
+c) For each of the three separate estimates the trend, obtain a histogram of the
+rough f^Xtg, and the normal probability plot of f^Xtg. Do these graphs indicate
+any serious departure from the normality assumption? Explain. [R commands:
+"hist" for histogram, "qqnorm" for normal probability plot.]
+
+```{r}
+par(mfrow=c(1,2))
+hist(roughpoly, freq = F, main = "Histogram of Rough: Poly Trend", xlab = "Rough part")
+qqnorm(roughpoly, main = "Normal prob plot of Rough")
+qqline(roughpoly)
+
+```
+```{r}
+par(mfrow=c(1,2))
+hist(roughloess, freq = F, main = "Histogram of Rough: Poly Trend", xlab = "Rough part")
+qqnorm(roughloess, main = "Normal prob plot of Rough")
+qqline(roughloess)
+
+```
+
+```{r}
+par(mfrow=c(1,2))
+hist(roughspline, freq = F, main = "Histogram of Rough: Poly Trend", xlab = "Rough part")
+qqnorm(roughspline, main = "Normal prob plot of Rough")
+qqline(roughspline)
+
+```
+Explain: 
+
+
+
+
+
+(d) Comment on the relative merits of the three fits.
+
+
+
+(e) Based on your analyses, would you prefer to work with the original series,
+or the transformed series flog(Yt)g? Explain you answer.
+
+
+
+
+
+
+\newpage
+
+### Code Appendix
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
